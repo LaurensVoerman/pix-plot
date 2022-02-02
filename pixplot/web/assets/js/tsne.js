@@ -869,6 +869,7 @@ function World() {
   this.elems = {
     pointSize: document.querySelector('#pointsize-range-input'),
     borderWidth: document.querySelector('#border-width-range-input'),
+    bgColor: document.querySelector('#bg-color'),
     selectTooltip: document.querySelector('#select-tooltip'),
     selectTooltipButton: document.querySelector('#select-tooltip-button'),
     mobileInteractions: document.querySelector('#mobile-interaction-guide'),
@@ -984,6 +985,7 @@ World.prototype.addEventListeners = function() {
   this.addResizeListener();
   this.addLostContextListener();
   this.addScalarChangeListener();
+  this.addBgColorChangeListener();
   this.addBorderWidthChangeListener();
   this.addTabChangeListeners();
   this.addModeChangeListeners();
@@ -1028,7 +1030,18 @@ World.prototype.addScalarChangeListener = function() {
   this.elems.pointSize.addEventListener('change', this.setScaleUniforms.bind(this));
   this.elems.pointSize.addEventListener('input', this.setScaleUniforms.bind(this));
 }
+/**
+* Update the background color when the user changes the input field
+**/
 
+World.prototype.addBgColorChangeListener = function() {
+  this.elems.bgColor.addEventListener('change', this.setBackgroundColor.bind(this));
+  this.elems.bgColor.addEventListener('input', this.setBackgroundColor.bind(this));
+}
+
+World.prototype.setBackgroundColor = function(e) {
+  world.scene.background.set(e.target.value);
+}
 /**
 * Update the border width when users change the input slider
 **/
@@ -1632,6 +1645,7 @@ World.prototype.render = function() {
 
 World.prototype.init = function() {
   this.setCenter();
+  this.scene.background.set(this.elems.bgColor.value);
   // center the camera and position the controls
   var loc = this.getInitialLocation();
   this.camera.position.set(loc.x, loc.y, loc.z);
