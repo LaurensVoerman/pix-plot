@@ -804,9 +804,8 @@ Layout.prototype.setText = function() {
   var path = data.json.layouts[this.selected].labels;
   if (path && text.mesh) {
     get(getPath(path), text.formatText.bind(text));
-    text.mesh.material.uniforms.render.value = 1.0;
   } else {
-    text.mesh.material.uniforms.render.value = 0.0;
+    text.mesh.visible = false;
   }
 }
 
@@ -2445,8 +2444,8 @@ Dates.prototype.addFilter = function() {
 function Text() {}
 
 Text.prototype.init = function() {
-  if (!data.json.layouts.date) return;
-  this.count = 1000; // max number of characters to represent
+  //if (!data.json.layouts.date) return;
+  this.count = 10; // max number of characters to represent
   this.point = 128.0; // px of each letter in atlas texture
   this.scale = 0; // 8 so 'no date' fits in one grid space
   this.kerning = 0; // scalar specifying y axis letter spacing
@@ -2470,7 +2469,7 @@ Text.prototype.getTexture = function() {
       ctx = canvas.getContext('2d'),
       characterMap = {},
       xOffset = 0.2, // offset to draw letters in center of grid position
-      yOffset = 0.2, // offset to draw full letters w/ baselines...
+      yOffset = 0.25, // offset to draw full letters w/ baselines...
       charFirst = 48, // ord of the first character in the map
       charLast = 122, // ord of the last character in the map
       skips = ':;<=>?@[\\]^_`', // any characters to skip in the map
@@ -2508,7 +2507,8 @@ Text.prototype.getTexture = function() {
 // initialize the text mesh
 Text.prototype.createMesh = function() {
   // set mesh sizing attributes based on number of columns in each bar group
-  this.scale = config.size.points.date;
+  //this.scale = config.size.points.date;
+  this.scale = isNaN(config.size.points.date) ? 0.025 : config.size.points.date;
   this.kerning = this.scale * 0.8;
   // create the mesh
   var geometry = new THREE.BufferGeometry(),
@@ -2534,23 +2534,35 @@ Text.prototype.createMesh = function() {
         type: 't',
         value: this.texture.tex,
       },
-      render: {
-        type: 'f',
-        value: 0, // 0=false; 1=true
-      },
     },
     vertexShader: document.querySelector('#text-vertex-shader').textContent,
     fragmentShader: document.querySelector('#text-fragment-shader').textContent,
   });
   this.mesh = new THREE.Points(geometry, material);
+  geometry.setDrawRange( 0, 0 );//draw none of these points
+  this.mesh.visible = false;
   this.mesh.frustumCulled = false;
   world.scene.add(this.mesh);
 }
 
 // arr = [{word: x: y: z: }, ...]
 Text.prototype.setWords = function(arr) {
-  var offsets = new Uint16Array(this.count*2),
-      positions = new Float32Array(this.count*3),
+  var drawCount = 0; // draw the first n points, only
+  arr.forEach(function(i, idx) { 
+    drawCount += i.word.length;
+  });
+  if (drawCount > this.count) {
+    this.count = drawCount;
+    var newpositions = new THREE.BufferAttribute(new Float32Array(this.count*3), 3),
+        newoffsets = new THREE.BufferAttribute(new Uint16Array(this.count*2), 2);
+    this.mesh.geometry.setAttribute('position', newpositions);
+    this.mesh.geometry.setAttribute('offset', newoffsets);
+  }
+  this.mesh.geometry.setDrawRange( 0, drawCount );
+  this.mesh.visible = (drawCount > 0);
+
+  var offsets = this.mesh.geometry.attributes.offset.array,
+      positions = this.mesh.geometry.attributes.position.array,
       offsetIdx = 0,
       positionIdx = 0;
   arr.forEach(function(i, idx) {
@@ -2567,8 +2579,6 @@ Text.prototype.setWords = function(arr) {
       positions[positionIdx++] = i.y;
       positions[positionIdx++] = i.z || 0;
     }
-    this.mesh.geometry.attributes.position.array = positions;
-    this.mesh.geometry.attributes.offset.array = offsets;
     this.mesh.geometry.attributes.position.needsUpdate = true;
     this.mesh.geometry.attributes.offset.needsUpdate = true;
   }.bind(this));
