@@ -342,7 +342,6 @@
     precision highp float;
 
     uniform sampler2D texture;
-    uniform float render;
     uniform float point;
     uniform float canvas;
 
@@ -352,7 +351,7 @@
       vec2 uv = vec2(vOffset.x/point + gl_PointCoord.x, vOffset.y/point + gl_PointCoord.y);
       uv *= point/canvas;
       gl_FragColor = texture2D(texture, uv);
-      if (gl_FragColor.r < 0.1 || render < 0.5) discard;
+      if (gl_FragColor.r < 0.1 ) discard;
     }
     </script>
 
