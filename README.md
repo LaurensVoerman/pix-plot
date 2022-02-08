@@ -1,3 +1,22 @@
+# Test 1
+This is a copy of my (Laurens Voerman) working repro, containing a few small changes to the pix-plot master:
+```bash
+-background color change option,
+-text rendering for labels,
+-screen allingned images (in fly mode)
+```
+
+## Quickstart
+```bash
+pip uninstall pixplot
+pip install https://github.com/LaurensVoerman/pix-plot/archive/test1.zip
+```
+For added security, serve http for local machine only:
+
+```bash
+python -m http.server 5000 --bind localhost
+```
+
 # PixPlot
 
 This repository contains code that can be used to visualize tens of thousands of images in a two-dimensional projection within which similar images are clustered together. The image analysis uses Tensorflow's Inception bindings, and the visualization layer uses a custom WebGL viewer.
