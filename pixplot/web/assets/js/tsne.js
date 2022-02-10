@@ -2425,6 +2425,79 @@ Dates.prototype.addFilter = function() {
 }
 
 /**
+* Draw grid into the scene
+**/
+
+function Grid() {}
+
+Grid.prototype.init = function() {
+  this.elems = {
+    input: document.querySelector('#grid-input'),
+  }
+  this.createMesh();
+  //document.querySelector('#grid-container').classList.add('visible');
+  this.addEventListeners();
+}
+// initialize the grid mesh
+Grid.prototype.createMesh = function() {
+  var domain = data.boundingBox;
+  var width = (domain.x.max-domain.x.min);
+  var height = (domain.y.max-domain.y.min);
+  const geometry = new THREE.PlaneGeometry( width, height );
+  const material = new THREE.RawShaderMaterial({
+  vertexShader: `
+precision highp float;
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+attribute vec3 position;  
+varying highp vec2 vUv;
+varying highp float scalew;
+void main() {
+  vUv = position.xy;
+  vec4 pos = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+  scalew = 0.025 * pos.w;//0.05=fine grid; 0.1=course grid
+  gl_Position = pos;
+}
+`,
+  fragmentShader: `
+precision highp float;
+varying highp vec2 vUv;
+varying highp float scalew;
+void main() {
+  vec2 scale;
+  highp float scaleStep = pow(10.0, floor(log2(scalew)*0.30103) );//scaleStep=10^n
+  scale.x = scale.y = scaleStep;
+//  if ((gl_FragCoord.x < 75.0) ||
+//      (gl_FragCoord.y < 75.0)) {
+//     scaleStep *= 0.20;//line width
+//	 scale *= 0.1;//detail grid
+//  }
+  vec2 shiftUv = vUv + 0.5 * vec2(scaleStep,scaleStep);
+  vec2 grid = mod(shiftUv , scale * 10.0);
+  if (grid.x > scaleStep && grid.y > scaleStep) discard; //grid x,y
+  //axis
+  if ((shiftUv.x == grid.x) && (grid.x < scaleStep)) { gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);return;}//red x-axis
+  if ((shiftUv.y == grid.y) && (grid.y < scaleStep)) { gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);return;}//green y-axis
+  float gray = 0.25;
+  //major lines:
+  vec2 grid10 = mod(shiftUv , scale * 100.0);
+  if (grid10.x < scaleStep || grid10.y < scaleStep) gray *= 2.0;
+  gl_FragColor = vec4(gray, gray,  gray, 1.0);
+}
+`  });
+  this.plane = new THREE.Mesh( geometry, material );
+
+  this.plane.visible = this.elems.input.checked;
+  //this.plane.frustumCulled = false;
+  world.scene.add(this.plane);
+}
+Grid.prototype.addEventListeners = function() {
+  this.elems.input.addEventListener('click', function(e) {
+    //this.elems.input.checked = !this.elems.input.checked;
+	this.plane.visible = this.elems.input.checked;
+  }.bind(this));	
+}
+/**
 * Draw text into the scene
 **/
 
@@ -3646,6 +3719,7 @@ Welcome.prototype.startWorld = function() {
     world.init();
     picker.init();
     text.init();
+    grid.init();
     dates.init();
     setTimeout(function() {
       requestAnimationFrame(function() {
@@ -4205,6 +4279,7 @@ var lasso = new Lasso();
 var layout = new Layout();
 var world = new World();
 var text = new Text();
+var grid = new Grid();
 var dates = new Dates();
 var lod = new LOD();
 var settings = new Settings();
