@@ -575,6 +575,25 @@ input[type=range]::-ms-thumb {
 }
 
 /**
+* Grid
+**/
+
+#grid-container {
+  display: inline-block;
+  margin: 0 5px;
+}
+
+#grid-container,
+#grid-container * {
+  cursor: pointer;
+}
+
+#grid-container input {
+  position: relative;
+  top: 2px;
+}
+
+/**
 * Jitter
 **/
 
