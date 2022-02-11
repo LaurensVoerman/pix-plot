@@ -3700,7 +3700,7 @@ function Welcome() {
 }
 
 Welcome.prototype.onButtonClick = function(e) {
-  if (e.target.className.indexOf('active') > -1) {
+  if ((e === undefined) || (e.target.className.indexOf('active') > -1)) {
     requestAnimationFrame(function() {
       this.removeLoader(function() {
         this.startWorld();
@@ -3735,6 +3735,7 @@ Welcome.prototype.updateProgress = function() {
       data.loadedTextures == data.textureCount &&
       world.heightmap) {
     this.buttonElem.className += ' active';
+    if (window.location.href.includes('enter'))this.onButtonClick();
   }
 }
 
