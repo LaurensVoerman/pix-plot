@@ -2543,7 +2543,7 @@ Text.prototype.getTexture = function() {
       characterMap = {},
       xOffset = 0.2, // offset to draw letters in center of grid position
       yOffset = 0.25, // offset to draw full letters w/ baselines...
-      charFirst = 48, // ord of the first character in the map
+      charFirst = 32, // ord of the first character in the map
       charLast = 122, // ord of the last character in the map
       skips = ':;<=>?@[\\]^_`', // any characters to skip in the map
       chars = charLast - charFirst - skips.length + 1; // n characters to include in map
