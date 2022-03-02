@@ -1,6 +1,6 @@
 # Test 2
 This is a copy of my (Laurens Voerman) working repro, containing a few small changes to the pix-plot master:
-```bash
+```
     test2:
 -added multilevel grid
 -removed google analitics
@@ -12,7 +12,7 @@ This is a copy of my (Laurens Voerman) working repro, containing a few small cha
 ```
 
 ## Quickstart
-```bash
+```
 pip uninstall pixplot
 pip install https://github.com/LaurensVoerman/pix-plot/archive/test2.zip
 ```
