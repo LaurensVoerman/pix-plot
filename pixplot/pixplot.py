@@ -1,4 +1,6 @@
 from __future__ import division
+
+import hashlib
 import warnings; warnings.filterwarnings('ignore')
 
 ##
@@ -596,6 +598,9 @@ def get_inception_vectors(**kwargs):
   return np.array(vecs)
 
 
+def string2hex(text):
+  return hashlib.md5(text.encode('utf-8')).hexdigest()
+
 def get_text_vectors(**kwargs):
   print(timestamp(), 'Creating text vectors for {} texts.'.format(len(kwargs['metadata'])))
   text_vector_dir = os.path.join(kwargs['out_dir'], 'text-vectors', 'mluse')
@@ -607,8 +612,13 @@ def get_text_vectors(**kwargs):
   text_vectors = np.empty((len(texts), probe.shape[1]))
 
   for idx, text in enumerate(tqdm(texts)):
-    text_vectors[idx] = embed(text)
-
+    vector_path = os.path.join(text_vector_dir, string2hex(text) + '.npy')
+    if os.path.exists(vector_path) and kwargs['use_cache']:
+      vec = np.load(vector_path)
+    else:
+      vec = embed(text)
+      np.save(vector_path, vec)
+    text_vectors[idx] = vec
   return text_vectors
 
 
@@ -638,10 +648,12 @@ def process_single_layout_umap(v, **kwargs):
   print(timestamp(), 'Creating single umap layout')
   model = get_umap_model(**kwargs)
   out_path = get_path('layouts', 'umap', **kwargs)
-  if cuml_ready:
+  if cuml_ready and False:
     z = model.fit(v).embedding_
   else:
-    if os.path.exists(out_path) and kwargs['use_cache']: return out_path
+    # commented out line below because it seems buggy
+    # returning a path rather than a dict object - mhvdr
+    # if os.path.exists(out_path) and kwargs['use_cache']: return out_path
     y = []
     if kwargs.get('metadata', False):
       labels = [i.get('label', None) for i in kwargs['metadata']]
