@@ -648,7 +648,7 @@ def process_single_layout_umap(v, **kwargs):
   print(timestamp(), 'Creating single umap layout')
   model = get_umap_model(**kwargs)
   out_path = get_path('layouts', 'umap', **kwargs)
-  if cuml_ready and False:
+  if cuml_ready:
     z = model.fit(v).embedding_
   else:
     # commented out line below because it seems buggy
