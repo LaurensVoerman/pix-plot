@@ -142,6 +142,7 @@ config = {
   'seed': 24,
   'n_clusters': 12,
   'geojson': None,
+  'use_text': True
 }
 
 
@@ -160,7 +161,8 @@ def process_images(**kwargs):
   kwargs['image_paths'], kwargs['metadata'] = filter_images(**kwargs)
   kwargs['atlas_dir'] = get_atlas_data(**kwargs)
   kwargs['vecs'] = get_inception_vectors(**kwargs)
-  kwargs['vecs_text'] = get_text_vectors(**kwargs)
+  if config['use_text']:
+    kwargs['vecs_text'] = get_text_vectors(**kwargs)
   get_manifest(**kwargs)
   write_images(**kwargs)
   print(timestamp(), 'Done!')
@@ -612,8 +614,18 @@ def get_text_vectors(**kwargs):
 
 def get_umap_layout(**kwargs):
   '''Get the x,y positions of images passed through a umap projection'''
+
   vecs = kwargs['vecs']
   w = PCA(n_components=min(100, len(vecs))).fit_transform(vecs)
+
+  if config['use_text']:
+    text_vectors = kwargs['vecs_text']
+    text_lower = PCA(n_components=min(100, len(vecs))).fit_transform(text_vectors)
+    # ensure both modalities have the same total variance
+    w = np.hstack(
+        (w / np.sqrt((w ** 2).sum()), text_lower / np.sqrt((text_lower ** 2).sum()))
+    )
+
   # single model umap
   if len(kwargs['n_neighbors']) == 1 and len(kwargs['min_dist']) == 1:
     return process_single_layout_umap(w, **kwargs)
@@ -1384,6 +1396,7 @@ def parse():
   parser.add_argument('--seed', type=int, default=config['seed'], help='seed for random processes')
   parser.add_argument('--n_clusters', type=int, default=config['n_clusters'], help='number of clusters to use when clustering with kmeans')
   parser.add_argument('--geojson', type=str, default=config['geojson'], help='path to a GeoJSON file with shapes to be rendered on a map')
+  parser.add_argument('--use-text', type=bool, default=config['use_text'])
   config.update(vars(parser.parse_args()))
   process_images(**config)
 
