@@ -25,38 +25,42 @@ def timestamp():
 ##
 
 if '--copy_web_only' not in sys.argv:
-
-  from tensorflow.keras.preprocessing.image import save_img, img_to_array, array_to_img
-  from tensorflow.keras.applications.inception_v3 import preprocess_input
-  from tensorflow.keras.applications import InceptionV3, imagenet_utils
-  from sklearn.metrics import pairwise_distances_argmin_min
-  from tensorflow.keras.preprocessing.image import load_img
-  from collections import defaultdict, namedtuple
-  from dateutil.parser import parse as parse_date
-  from sklearn.preprocessing import minmax_scale
-  from pointgrid import align_points_to_grid
-  from tensorflow.keras.models import Model
-  from scipy.spatial.distance import cdist
-  from sklearn.decomposition import PCA
-  import tensorflow.keras.backend as K
-  from iiif_downloader import Manifest
-  from rasterfairy import coonswarp
-  from tensorflow import compat
-  from scipy.stats import kde
-  from PIL import ImageFile
-  import multiprocessing
-  from tqdm import tqdm
-  import rasterfairy
-  import numpy as np
+  import copy
+  import csv
+  import gzip
   import itertools
+  import json
+  import math
+  import multiprocessing
   import operator
   import pickle
   import random
-  import copy
-  import math
-  import gzip
-  import json
-  import csv
+  from collections import defaultdict, namedtuple
+
+  import numpy as np
+  import rasterfairy
+  import tensorflow_hub
+  from dateutil.parser import parse as parse_date
+  from iiif_downloader import Manifest
+  from PIL import ImageFile
+  from pointgrid import align_points_to_grid
+  from rasterfairy import coonswarp
+  from scipy.spatial.distance import cdist
+  from scipy.stats import kde
+  from sklearn.decomposition import PCA
+  from sklearn.preprocessing import minmax_scale
+  from tensorflow import compat
+  from tensorflow.keras.applications import InceptionV3
+  from tensorflow.keras.applications.inception_v3 import preprocess_input
+  from tensorflow.keras.models import Model
+  from tensorflow.keras.preprocessing.image import (
+    array_to_img,
+    img_to_array,
+    load_img,
+    save_img,
+  )
+  from tensorflow_text import SentencepieceTokenizer
+  from tqdm import tqdm
 
   ##
   # Python 2 vs 3 imports
@@ -156,6 +160,7 @@ def process_images(**kwargs):
   kwargs['image_paths'], kwargs['metadata'] = filter_images(**kwargs)
   kwargs['atlas_dir'] = get_atlas_data(**kwargs)
   kwargs['vecs'] = get_inception_vectors(**kwargs)
+  kwargs['vecs_text'] = get_text_vectors(**kwargs)
   get_manifest(**kwargs)
   write_images(**kwargs)
   print(timestamp(), 'Done!')
@@ -587,6 +592,22 @@ def get_inception_vectors(**kwargs):
       vecs.append(vec)
       progress_bar.update(1)
   return np.array(vecs)
+
+
+def get_text_vectors(**kwargs):
+  print(timestamp(), 'Creating text vectors for {} texts.'.format(len(kwargs['metadata'])))
+  text_vector_dir = os.path.join(kwargs['out_dir'], 'text-vectors', 'mluse')
+  if not os.path.exists(text_vector_dir): os.makedirs(text_vector_dir)
+  embed = tensorflow_hub.load('https://tfhub.dev/google/universal-sentence-encoder-multilingual-large/3')
+
+  texts = [md["description"] for md in kwargs["metadata"]]
+  probe = embed(texts[0])
+  text_vectors = np.empty((len(texts), probe.shape[1]))
+
+  for idx, text in enumerate(tqdm(texts)):
+    text_vectors[idx] = embed(text)
+
+  return text_vectors
 
 
 def get_umap_layout(**kwargs):
