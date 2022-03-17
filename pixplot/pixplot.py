@@ -177,9 +177,9 @@ def copy_web_assets(**kwargs):
   # write version numbers into output
   for i in ['index.html', os.path.join('assets', 'js', 'tsne.js')]:
     path = join(dest, i)
-    with open(path, 'r') as f:
+    with open(path, 'r', encoding='utf-8') as f:
       f = f.read().replace('VERSION_NUMBER', get_version())
-      with open(path, 'w') as out:
+      with open(path, 'w', encoding='utf-8') as out:
         out.write(f)
   if kwargs['copy_web_only']:
     print(timestamp(), 'Done!')
