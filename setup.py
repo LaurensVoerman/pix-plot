@@ -50,6 +50,8 @@ setup(
     'scipy==1.4.0',
     'six==1.15.0',
     'tensorflow==2.5.0',
+    'tensorflow-hub==0.12.0',
+    'tensorflow-text==2.5.0',
     'tqdm==4.61.1',
     'umap-learn==0.5.1',
     'yale-dhlab-rasterfairy>=1.0.3',
