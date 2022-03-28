@@ -726,6 +726,7 @@ Layout.prototype.set = function(layout, enableDelay) {
         data.cells[i].tz = pos[i][2] || data.cells[i].getZ(pos[i][0], pos[i][1]);
         data.cells[i].setBuffer('targetTranslation');
       }
+      filters.updateCellPos();
       // update the transition uniforms and targetPosition buffers on each mesh
       for (var i=0; i<world.group.children.length; i++) {
         world.group.children[i].geometry.attributes.targetTranslation.needsUpdate = true;
@@ -820,6 +821,7 @@ Layout.prototype.onTransitionComplete = function() {
     cell.z = cell.tz;
     cell.setBuffer('translation');
   });
+  filters.updateCellPos();
   // pass each updated position buffer to the gpu
   for (var i=0; i<world.group.children.length; i++) {
     world.group.children[i].geometry.attributes.translation.needsUpdate = true;
@@ -1765,6 +1767,144 @@ World.prototype.addDeviceInteractionGuide = function() {
 }
 
 /**
+* LinkLines: LineSegments of a graph
+**/
+
+function LinkLines() {
+}
+
+LinkLines.prototype.setLinks = function(json){
+  const myColor = new THREE.Color(json.color);
+  const material = new THREE.RawShaderMaterial({
+    uniforms: {
+      color: { value: myColor },
+      transitionPercent: world.uniforms.transitionPercent,
+    },
+  vertexShader: `
+precision highp float;
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform float transitionPercent;
+
+attribute vec3 position;  
+attribute vec3 targetposition;  
+void main() {
+  vec3 pos = mix(position, targetposition, transitionPercent);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4( pos, 1.0 );
+}
+`,
+  fragmentShader: `
+precision highp float;
+uniform vec3 color;
+void main() {
+  gl_FragColor = vec4(color, 1.0);
+}
+`  });  
+  
+  const points = [];
+  if (json.lines) json.lines.forEach(function(segment) {
+    let idx = segment[0];
+    points.push( new THREE.Vector3( data.cells[idx].x,data.cells[idx].y,data.cells[idx].z));
+    idx = segment[1];
+    points.push( new THREE.Vector3( data.cells[idx].x,data.cells[idx].y,data.cells[idx].z));
+  });
+  if (json.labels) json.labels.forEach(function(lbl) {
+    let label_index;// undefined = not found
+    if (lbl.index) label_index = lbl.index;
+    else if (lbl.name && text.json.labels) {//find name in labels
+	  label_index = text.json.labels.findIndex(word => word == lbl.name);
+    }
+    lbl.images.forEach(function(img_index) {
+      points.push( new THREE.Vector3( data.cells[img_index].x,data.cells[img_index].y,data.cells[img_index].z));
+     if (label_index && text.mesh.visible && text.json.positions && (label_index < text.json.positions.length)) {
+       points.push( new THREE.Vector3( text.json.positions[label_index][0], text.json.positions[label_index][1], text.json.positions[label_index][2] || 0));
+     } else {//label not found (yet), make line length 0
+       points.push( new THREE.Vector3( data.cells[img_index].x,data.cells[img_index].y,data.cells[img_index].z));
+     }
+    });
+  });
+
+  const geometry = new THREE.BufferGeometry().setFromPoints( points );
+  const line = new THREE.LineSegments( geometry, material );
+  
+  let pos = geometry.getAttribute('position');
+  let tpos = pos.clone();
+  geometry.setAttribute('targetposition', tpos);
+  this.lines = line;
+  this.json = json;//keep a ref
+  //this.updateCellPos();//just testing
+}
+
+LinkLines.prototype.updateCellPos = function(){//update when cells have moved
+  if (!this.lines) return;
+  let pos = this.lines.geometry.getAttribute('position');
+  let tpos = this.lines.geometry.getAttribute('targetposition');
+  this.json.lines.forEach(function(segment, index) {
+    let start = segment[0];
+    let end = segment[1];
+    pos.array[6*index] = data.cells[start].x;
+    pos.array[6*index+1] = data.cells[start].y;
+    pos.array[6*index+2] = data.cells[start].z;
+    pos.array[6*index+3] = data.cells[end].x;
+    pos.array[6*index+4] = data.cells[end].y;
+    pos.array[6*index+5] = data.cells[end].z;
+    tpos.array[6*index]   = data.cells[start].tx;
+    tpos.array[6*index+1] = data.cells[start].ty;
+    tpos.array[6*index+2] = data.cells[start].tz;
+    tpos.array[6*index+3] = data.cells[end].tx;
+    tpos.array[6*index+4] = data.cells[end].ty;
+    tpos.array[6*index+5] = data.cells[end].tz;
+  });
+  pos.needsUpdate = true;
+  tpos.needsUpdate = true;
+  this.updateLabelPos();
+}
+LinkLines.prototype.updateLabelPos = function(){//update when labels have moved
+  if (!this.lines) return;
+  let pos = this.lines.geometry.getAttribute('position');
+  let tpos = this.lines.geometry.getAttribute('targetposition');
+  let index = this.json.lines ? this.json.lines.length : 0;
+  if (this.json.labels) this.json.labels.forEach(function(lbl) {
+    let label_index;// = not found
+    if (lbl.index) label_index = lbl.index;
+    else if (lbl.name && text.json.labels) {//find name in labels
+      label_index = text.json.labels.findIndex(word => word == lbl.name);
+    }
+    lbl.images.forEach(function(img_index) {
+      pos.array[6*index] = data.cells[img_index].x;
+      pos.array[6*index+1] = data.cells[img_index].y;
+      pos.array[6*index+2] = data.cells[img_index].z;
+      tpos.array[6*index]   = data.cells[img_index].tx;
+      tpos.array[6*index+1] = data.cells[img_index].ty;
+      tpos.array[6*index+2] = data.cells[img_index].tz;
+      if (label_index && text.mesh.visible) {
+        pos.array[6*index+3] = text.json.positions[label_index][0];
+        pos.array[6*index+4] = text.json.positions[label_index][1];
+        pos.array[6*index+5] = text.json.positions[label_index][2] || 0;
+        tpos.array[6*index+3] = pos.array[6*index+3];
+        tpos.array[6*index+4] = pos.array[6*index+4];
+        tpos.array[6*index+5] = pos.array[6*index+5];
+      } else {//label not found (yet), make line length 0
+        pos.array[6*index+3] = data.cells[img_index].x;
+        pos.array[6*index+4] = data.cells[img_index].y;
+        pos.array[6*index+5] = data.cells[img_index].z;
+        tpos.array[6*index+3] = data.cells[img_index].tx;
+        tpos.array[6*index+4] = data.cells[img_index].ty;
+        tpos.array[6*index+5] = data.cells[img_index].tz;
+      }
+	  ++index;
+    });
+  }); 
+  pos.needsUpdate = true;
+  tpos.needsUpdate = true;
+}
+LinkLines.prototype.show = function() {
+world.scene.add( this.lines );
+}
+LinkLines.prototype.remove = function() {
+world.scene.remove( this.lines );
+}
+/**
 * Lasso: polyline user-selections
 **/
 
@@ -2676,6 +2816,8 @@ Text.prototype.formatText = function(json) {
     })
   })
   this.setWords(l);
+  this.json = json;
+  filters.updateLabelPos();
 }
 
 
@@ -3072,7 +3214,20 @@ Filters.prototype.filterImages = function() {
   }
   world.setOpaqueImages(indices);
 }
-
+Filters.prototype.updateCellPos = function() {
+  for (var j=0; j<this.filters.length; j++) {
+    if (this.filters[j].linkLines) {
+      this.filters[j].linkLines.forEach(element => element.updateCellPos());
+    }
+  }
+}
+Filters.prototype.updateLabelPos = function() {
+  for (var j=0; j<this.filters.length; j++) {
+    if (this.filters[j].linkLines) {
+      this.filters[j].linkLines.forEach(element => element.updateLabelPos());
+    }
+  }
+}
 function Filter(obj) {
   this.values = obj.filter_values || [];
   if (this.values.length <= 1) return;
@@ -3085,7 +3240,7 @@ function Filter(obj) {
   this.desktopSelect.className = 'filter';
   var label = document.createElement('div');
   label.className = 'settings-label filter-label';
-  label.textContent = 'Category';
+  label.textContent = this.name;//'Category';
   this.desktopSelect.appendChild(label);
   // create the mobile filter's select
   this.mobileSelect = document.createElement('select');
@@ -3139,8 +3294,17 @@ Filter.prototype.onChange = function(isDesktop, e) {
   var elem = e.target;
   // get the value that's selected for this filter
   this.selected = this.getSelected(isDesktop, e);
+  if (this.name === "select") {
   this.showSelected();
   this.filterImages();
+  } else {
+    if (this.name === "link") {
+      const index = this.values.findIndex(value => value === this.selected);
+      if (index !== -1) {
+        this.linkImages(index, e.target.parentNode.children[0].checked);
+      }
+    }
+  }
 }
 
 Filter.prototype.getSelected = function(isDesktop, e) {
@@ -3190,6 +3354,22 @@ Filter.prototype.filterImages = function() {
         return image in vals;
       }
       filters.filterImages();
+    }.bind(this))
+  }
+}
+
+Filter.prototype.linkImages = function(index, enabled) {
+  if (!this.linkLines) {//not initialized
+    if (!enabled) return;
+    this.linkLines = Array.apply(null, Array(this.values.length)).map(function () {return new LinkLines();})
+  }
+  this.linkLines[index].remove();//remove visible geometry
+  if (enabled) {
+    var filename = this.selected.replace(/\//g, '-').replace(/ /g, '__') + '.json',
+        path = getPath(config.data.dir + '/metadata/options/' + filename);
+    get(path, function(json) {
+      this.linkLines[index].setLinks(json);
+      this.linkLines[index].show();
     }.bind(this))
   }
 }
