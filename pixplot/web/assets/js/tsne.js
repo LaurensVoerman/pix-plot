@@ -727,19 +727,19 @@ Layout.prototype.set = function(layout, enableDelay) {
         data.cells[i].setBuffer('targetTranslation');
       }
       // update the transition uniforms and targetPosition buffers on each mesh
-      var animatable = [];
       for (var i=0; i<world.group.children.length; i++) {
         world.group.children[i].geometry.attributes.targetTranslation.needsUpdate = true;
-        animatable.push(world.group.children[i].material.uniforms.transitionPercent);
       }
       // begin the animation
       TweenMax.to(
-        animatable,
+        world.uniforms.transitionPercent,
         config.transitions.duration,
-        config.transitions.ease,
+        {
+          value: config.transitions.ease.value,
+          ease: config.transitions.ease.ease,
+          onComplete: this.onTransitionComplete.bind(this)
+        }
       );
-      // prepare to update all the cell buffers once transition completes
-      setTimeout(this.onTransitionComplete.bind(this), config.transitions.duration * 1000);
     }.bind(this))
   }.bind(this), delay);
 }
@@ -823,8 +823,8 @@ Layout.prototype.onTransitionComplete = function() {
   // pass each updated position buffer to the gpu
   for (var i=0; i<world.group.children.length; i++) {
     world.group.children[i].geometry.attributes.translation.needsUpdate = true;
-    world.group.children[i].material.uniforms.transitionPercent = {type: 'f', value: 0};
   }
+  world.uniforms.transitionPercent.value = 0;
   // indicate the world is no longer transitioning
   world.state.transitioning = false;
   // set the current point scale value
@@ -845,6 +845,7 @@ Layout.prototype.onTransitionComplete = function() {
 * center: a map identifying the midpoint of cells' positions in x,y dims
 * group: the group of meshes used to render cells
 * state: a map identifying internal state of the world
+* uniforms: list of uniforms shared by all objects
 **/
 
 function World() {
@@ -864,6 +865,12 @@ function World() {
     displayed: false,
     mode: 'pan', // 'pan' || 'select'
     togglingMode: false,
+  };
+  this.uniforms = {
+      transitionPercent: {
+        type: 'f',
+        value: 0,
+      },
   };
   this.elems = {
     pointSize: document.querySelector('#pointsize-range-input'),
@@ -1366,10 +1373,7 @@ World.prototype.getShaderMaterial = function(obj) {
         type: 't',
         value: lod.tex.texture,
       },
-      transitionPercent: {
-        type: 'f',
-        value: 0,
-      },
+      transitionPercent: this.uniforms.transitionPercent,
       scale: {
         type: 'f',
         value: this.getPointScale(),
