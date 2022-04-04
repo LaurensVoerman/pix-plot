@@ -1,10 +1,36 @@
-# PixPlot
+# PixPlot-Mod
+This is a copy of my (Laurens Voerman) working repro, containing some changes to the pix-plot master:
+```
+-add filter of type "link", drawing lines between images or between images and labels.
+-allow '#' character in text
+-added autoclick on enter opion: http://localhost:5000/output/#enter
 
+-added multilevel grid
+-removed google analitics
+-added local font to avoid online google font.
+-background color change option,
+-text rendering for labels,
+-screen allingned images (in fly mode)
+```
+
+## Quickstart
+```
+pip uninstall pixplot
+pip install https://github.com/LaurensVoerman/pix-plot/archive/ppmod.zip
+```
+For added security, serve http for local machine only:
+
+```bash
+python -m http.server 5000 --bind localhost
+```
+## Image description field
+I merged in the python code from Michiel van der Ree, from https://github.com/michielree/pix-plot
 Fork of the original PixPlot project with added functionality to also embed images
 on a text associated with each image. Texts will be retrieved from the `description` field of the metadata file.
 Original ReadMe follows below.
 
 ---
+# PixPlot
 
 This repository contains code that can be used to visualize tens of thousands of images in a two-dimensional projection within which similar images are clustered together. The image analysis uses Tensorflow's Inception bindings, and the visualization layer uses a custom WebGL viewer.
 
