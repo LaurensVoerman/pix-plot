@@ -1809,14 +1809,15 @@ void main() {
     points.push( new THREE.Vector3( data.cells[idx].x,data.cells[idx].y,data.cells[idx].z));
   });
   if (json.labels) json.labels.forEach(function(lbl) {
-    let label_index;// undefined = not found
+    let label_index = -1;// undefined = not found
     if (lbl.index) label_index = lbl.index;
     else if (lbl.name && text.json.labels) {//find name in labels
 	  label_index = text.json.labels.findIndex(word => word == lbl.name);
     }
+    if ((!text.json.labels) || (label_index >= text.json.labels.length)) label_index = -1;
     lbl.images.forEach(function(img_index) {
       points.push( new THREE.Vector3( data.cells[img_index].x,data.cells[img_index].y,data.cells[img_index].z));
-     if (label_index && text.mesh.visible && text.json.positions && (label_index < text.json.positions.length)) {
+     if ((label_index >= 0) && text.mesh.visible && text.json.positions && (label_index < text.json.positions.length)) {
        points.push( new THREE.Vector3( text.json.positions[label_index][0], text.json.positions[label_index][1], text.json.positions[label_index][2] || 0));
      } else {//label not found (yet), make line length 0
        points.push( new THREE.Vector3( data.cells[img_index].x,data.cells[img_index].y,data.cells[img_index].z));
@@ -1865,11 +1866,12 @@ LinkLines.prototype.updateLabelPos = function(){//update when labels have moved
   let tpos = this.lines.geometry.getAttribute('targetposition');
   let index = this.json.lines ? this.json.lines.length : 0;
   if (this.json.labels) this.json.labels.forEach(function(lbl) {
-    let label_index;// = not found
+    let label_index = -1;// = not found
     if (lbl.index) label_index = lbl.index;
     else if (lbl.name && text.json.labels) {//find name in labels
       label_index = text.json.labels.findIndex(word => word == lbl.name);
     }
+    if ((!text.json.labels) || (label_index >= text.json.labels.length)) label_index = -1;
     lbl.images.forEach(function(img_index) {
       pos.array[6*index] = data.cells[img_index].x;
       pos.array[6*index+1] = data.cells[img_index].y;
@@ -1877,7 +1879,7 @@ LinkLines.prototype.updateLabelPos = function(){//update when labels have moved
       tpos.array[6*index]   = data.cells[img_index].tx;
       tpos.array[6*index+1] = data.cells[img_index].ty;
       tpos.array[6*index+2] = data.cells[img_index].tz;
-      if (label_index && text.mesh.visible) {
+      if ((label_index >= 0) && text.mesh.visible) {
         pos.array[6*index+3] = text.json.positions[label_index][0];
         pos.array[6*index+4] = text.json.positions[label_index][1];
         pos.array[6*index+5] = text.json.positions[label_index][2] || 0;
