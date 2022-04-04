@@ -23,10 +23,39 @@ For added security, serve http for local machine only:
 ```bash
 python -m http.server 5000 --bind localhost
 ```
+## Image link lines
+![Link lines preview](./pixplot/web/assets/images/link.png?raw=true)
+to draw link lines to connect images with images and images and labels, add a filter named "link" in "data\metadata\filters\filters.json" like this:
+```
+[
+    {"filter_name": "select","filter_values": ["Norsk__Folkemuseum","Norsk__Teknisk__Museum","Oslo__Museum"]},
+{
+  "filter_name": "link",
+  "filter_values": [ "link_test_1", "link_test_2" ]
+}
+]
+```
+a new drop down menu is added to the top bar called "link", with 2 select boxes for "link_test_1", "link_test_2"  
+then add a new file "data\metadata\options\link_test_2.json" with the following content:
+```
+{
+  "lines":[[0,19],[1,20],[2,21]],
+  "color": "#00ff00",
+  "labels":[
+    { "index": 1, "images": [0,1] },
+    { "name": "Norsk Teknisk Museum", "images": [329,330,331,332]}
+  ]
+}
+```
+lines: connect image pairs, referring to the images by index  
+color: the color of the lines  
+labels: connect label to images, referring to the images by index, the label can be referred to either by index or by name.  
+As the labels are read independently for each layout, they might be ordered differently or be absent in the current layout. If the label is not found in the current label the lines to that label will not be visible.
+
 ## Image description field
-I merged in the python code from Michiel van der Ree, from https://github.com/michielree/pix-plot
+I merged in the python code from Michiel van der Ree, from https://github.com/michielree/pix-plot  
 Fork of the original PixPlot project with added functionality to also embed images
-on a text associated with each image. Texts will be retrieved from the `description` field of the metadata file.
+on a text associated with each image. Texts will be retrieved from the `description` field of the metadata file.  
 Original ReadMe follows below.
 
 ---
