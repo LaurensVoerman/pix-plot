@@ -1,4 +1,6 @@
 from __future__ import division
+
+import hashlib
 import warnings; warnings.filterwarnings('ignore')
 
 ##
@@ -25,38 +27,42 @@ def timestamp():
 ##
 
 if '--copy_web_only' not in sys.argv:
-
-  from tensorflow.keras.preprocessing.image import save_img, img_to_array, array_to_img
-  from tensorflow.keras.applications.inception_v3 import preprocess_input
-  from tensorflow.keras.applications import InceptionV3, imagenet_utils
-  from sklearn.metrics import pairwise_distances_argmin_min
-  from tensorflow.keras.preprocessing.image import load_img
-  from collections import defaultdict, namedtuple
-  from dateutil.parser import parse as parse_date
-  from sklearn.preprocessing import minmax_scale
-  from pointgrid import align_points_to_grid
-  from tensorflow.keras.models import Model
-  from scipy.spatial.distance import cdist
-  from sklearn.decomposition import PCA
-  import tensorflow.keras.backend as K
-  from iiif_downloader import Manifest
-  from rasterfairy import coonswarp
-  from tensorflow import compat
-  from scipy.stats import kde
-  from PIL import ImageFile
-  import multiprocessing
-  from tqdm import tqdm
-  import rasterfairy
-  import numpy as np
+  import copy
+  import csv
+  import gzip
   import itertools
+  import json
+  import math
+  import multiprocessing
   import operator
   import pickle
   import random
-  import copy
-  import math
-  import gzip
-  import json
-  import csv
+  from collections import defaultdict, namedtuple
+
+  import numpy as np
+  import rasterfairy
+  import tensorflow_hub
+  from dateutil.parser import parse as parse_date
+  from iiif_downloader import Manifest
+  from PIL import ImageFile
+  from pointgrid import align_points_to_grid
+  from rasterfairy import coonswarp
+  from scipy.spatial.distance import cdist
+  from scipy.stats import kde
+  from sklearn.decomposition import PCA
+  from sklearn.preprocessing import minmax_scale
+  from tensorflow import compat
+  from tensorflow.keras.applications import InceptionV3
+  from tensorflow.keras.applications.inception_v3 import preprocess_input
+  from tensorflow.keras.models import Model
+  from tensorflow.keras.preprocessing.image import (
+    array_to_img,
+    img_to_array,
+    load_img,
+    save_img,
+  )
+  from tensorflow_text import SentencepieceTokenizer
+  from tqdm import tqdm
 
   ##
   # Python 2 vs 3 imports
@@ -138,6 +144,7 @@ config = {
   'seed': 24,
   'n_clusters': 12,
   'geojson': None,
+  'use_text': True
 }
 
 
@@ -156,6 +163,8 @@ def process_images(**kwargs):
   kwargs['image_paths'], kwargs['metadata'] = filter_images(**kwargs)
   kwargs['atlas_dir'] = get_atlas_data(**kwargs)
   kwargs['vecs'] = get_inception_vectors(**kwargs)
+  if config['use_text']:
+    kwargs['vecs_text'] = get_text_vectors(**kwargs)
   get_manifest(**kwargs)
   write_images(**kwargs)
   print(timestamp(), 'Done!')
@@ -177,9 +186,9 @@ def copy_web_assets(**kwargs):
   # write version numbers into output
   for i in ['index.html', os.path.join('assets', 'js', 'tsne.js')]:
     path = join(dest, i)
-    with open(path, 'r') as f:
+    with open(path, 'r', encoding='utf-8') as f:
       f = f.read().replace('VERSION_NUMBER', get_version())
-      with open(path, 'w') as out:
+      with open(path, 'w', encoding='utf-8') as out:
         out.write(f)
   if kwargs['copy_web_only']:
     print(timestamp(), 'Done!')
@@ -589,10 +598,44 @@ def get_inception_vectors(**kwargs):
   return np.array(vecs)
 
 
+def string2hex(text):
+  return hashlib.md5(text.encode('utf-8')).hexdigest()
+
+def get_text_vectors(**kwargs):
+  print(timestamp(), 'Creating text vectors for {} texts.'.format(len(kwargs['metadata'])))
+  text_vector_dir = os.path.join(kwargs['out_dir'], 'text-vectors', 'mluse')
+  if not os.path.exists(text_vector_dir): os.makedirs(text_vector_dir)
+  embed = tensorflow_hub.load('https://tfhub.dev/google/universal-sentence-encoder-multilingual-large/3')
+
+  texts = [md["description"] for md in kwargs["metadata"]]
+  probe = embed(texts[0])
+  text_vectors = np.empty((len(texts), probe.shape[1]))
+
+  for idx, text in enumerate(tqdm(texts)):
+    vector_path = os.path.join(text_vector_dir, string2hex(text) + '.npy')
+    if os.path.exists(vector_path) and kwargs['use_cache']:
+      vec = np.load(vector_path)
+    else:
+      vec = embed(text)
+      np.save(vector_path, vec)
+    text_vectors[idx] = vec
+  return text_vectors
+
+
 def get_umap_layout(**kwargs):
   '''Get the x,y positions of images passed through a umap projection'''
+
   vecs = kwargs['vecs']
   w = PCA(n_components=min(100, len(vecs))).fit_transform(vecs)
+
+  if config['use_text']:
+    text_vectors = kwargs['vecs_text']
+    text_lower = PCA(n_components=min(100, len(vecs))).fit_transform(text_vectors)
+    # ensure both modalities have the same total variance
+    w = np.hstack(
+        (w / np.sqrt((w ** 2).sum()), text_lower / np.sqrt((text_lower ** 2).sum()))
+    )
+
   # single model umap
   if len(kwargs['n_neighbors']) == 1 and len(kwargs['min_dist']) == 1:
     return process_single_layout_umap(w, **kwargs)
@@ -608,7 +651,9 @@ def process_single_layout_umap(v, **kwargs):
   if cuml_ready:
     z = model.fit(v).embedding_
   else:
-    if os.path.exists(out_path) and kwargs['use_cache']: return out_path
+    # commented out line below because it seems buggy
+    # returning a path rather than a dict object - mhvdr
+    # if os.path.exists(out_path) and kwargs['use_cache']: return out_path
     y = []
     if kwargs.get('metadata', False):
       labels = [i.get('label', None) for i in kwargs['metadata']]
@@ -1363,6 +1408,7 @@ def parse():
   parser.add_argument('--seed', type=int, default=config['seed'], help='seed for random processes')
   parser.add_argument('--n_clusters', type=int, default=config['n_clusters'], help='number of clusters to use when clustering with kmeans')
   parser.add_argument('--geojson', type=str, default=config['geojson'], help='path to a GeoJSON file with shapes to be rendered on a map')
+  parser.add_argument('--use-text', type=bool, default=config['use_text'])
   config.update(vars(parser.parse_args()))
   process_images(**config)
 

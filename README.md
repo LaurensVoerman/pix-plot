@@ -1,5 +1,11 @@
 # PixPlot
 
+Fork of the original PixPlot project with added functionality to also embed images
+on a text associated with each image. Texts will be retrieved from the `description` field of the metadata file.
+Original ReadMe follows below.
+
+---
+
 This repository contains code that can be used to visualize tens of thousands of images in a two-dimensional projection within which similar images are clustered together. The image analysis uses Tensorflow's Inception bindings, and the visualization layer uses a custom WebGL viewer.
 
 See the [change log](https://github.com/YaleDHLab/pix-plot/wiki/Change-Log) for recent updates.
